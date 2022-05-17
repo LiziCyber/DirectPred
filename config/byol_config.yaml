@@ -132,7 +132,8 @@ predictor_optimizer:
 
 dataset_path: ./datasets
 # Can be stl10 or cifar10
-dataset: stl10 
+dataset: stl10
+log_dir: ./
 
 seed: 1
 gpu: 0

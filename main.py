@@ -130,7 +130,8 @@ def main(args):
         optimizer.load_state_dict(ckpt['optimizer_state_dict'])
         if predictor:
             predictor.load_state_dict(ckpt['predictor_state_dict'])
-        args["trainer"]["pre_epoch"] = ckpt['epoch']
+        if args["trainer"]["pre_epoch"] == 0:
+            args["trainer"]["pre_epoch"] = ckpt['epoch']
         if predictor and train_params["train_predictor"]:
             predictor_optimizer.load_state_dict(ckpt["predictor_optimizer_state_dict"])
         log.info("Load checkpoint from {}.".format(resume["ckpt_dir"]))

@@ -28,6 +28,7 @@ trainer:
   target_noise: 0.005
   train_predictor: true
   has_predictor: true
+  pre_epoch: 0 # checkpoint epoch placeholder
 
   projector_params:
     has_bias: true
@@ -134,6 +135,10 @@ dataset_path: ./datasets
 # Can be stl10 or cifar10
 dataset: stl10
 log_dir: ./
+resume:
+  re_training: false
+  ckpt_dir: null
+
 
 seed: 1
 gpu: 0

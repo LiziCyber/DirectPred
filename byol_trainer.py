@@ -99,6 +99,8 @@ class Accumulator:
 
 class BYOLTrainer:
     def __init__(self, log_dir, online_network, target_network, predictor, optimizer, predictor_optimizer, device, **params):
+        self.epoch_counter = None
+        self.resume_epoch = None
         self.online_network = online_network
         self.target_network = target_network
         self.optimizer = optimizer
@@ -108,6 +110,7 @@ class BYOLTrainer:
         self.params = params
         self.writer = SummaryWriter(log_dir)
 
+        self.pre_epoch = params["pre_epoch"]
         self.rand_pred_n_epoch = params["rand_pred_n_epoch"]
         self.rand_pred_n_iter = params["rand_pred_n_iter"]
         self.rand_pred_reg = params["rand_pred_reg"]
@@ -553,7 +556,8 @@ class BYOLTrainer:
         # Save initial network for analysis
         self.save_model(os.path.join(model_checkpoints_folder, 'model_000.pth'))
 
-        for epoch_counter in range(1, 1 + self.max_epochs):
+        for self.epoch_counter in range(1 + self.pre_epoch, 1 + self.pre_epoch + self.max_epochs):
+            epoch_counter = self.epoch_counter
             loss_record = []
             suffix = str(epoch_counter).zfill(3)
 
@@ -766,4 +770,5 @@ class BYOLTrainer:
             'predictor_state_dict': self.predictor.state_dict(),
             'optimizer_state_dict': self.optimizer.state_dict(),
             'predictor_optimizer_state_dict': self.predictor_optimizer.state_dict(),
+            'epoch': self.epoch_counter
         }, PATH)

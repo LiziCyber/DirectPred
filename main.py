@@ -19,17 +19,20 @@ sys.path.append("../")
 import common_utils
 
 import logging
+
 log = logging.getLogger(__file__)
+
 
 def hydra2dict(args):
     if args.__class__.__name__ != 'DictConfig':
         return args
-        
+
     args = dict(args)
     for k in args.keys():
         args[k] = hydra2dict(args[k])
 
     return args
+
 
 @hydra.main("config/byol_config.yaml")
 def main(args):
@@ -50,10 +53,12 @@ def main(args):
 
     if args["dataset"] == "stl10":
         train_dataset = datasets.STL10(args.dataset_path, split='train+unlabeled', download=True,
-                                    transform=MultiViewDataInjector([data_transform, data_transform, data_transform_identity]))
+                                       transform=MultiViewDataInjector(
+                                           [data_transform, data_transform, data_transform_identity]))
     elif args["dataset"] == "cifar10":
         train_dataset = datasets.CIFAR10(args.dataset_path, train=True, download=True,
-                                    transform=MultiViewDataInjector([data_transform, data_transform, data_transform_identity]))
+                                         transform=MultiViewDataInjector(
+                                             [data_transform, data_transform, data_transform_identity]))
     else:
         raise RuntimeError(f"Unknown dataset! {args['dataset']}")
 
@@ -63,7 +68,8 @@ def main(args):
         train_params["projector_params"] = train_params["predictor_params"]
 
     # online network
-    online_network = ResNet18(dataset=args["dataset"], options=train_params["projector_params"], **args['network']).to(device)
+    online_network = ResNet18(dataset=args["dataset"], options=train_params["projector_params"], **args['network']).to(
+        device)
     if torch.cuda.device_count() > 1:
         online_network = torch.nn.parallel.DataParallel(online_network)
 
@@ -87,7 +93,8 @@ def main(args):
         predictor = None
 
     # target encoder
-    target_network = ResNet18(dataset=args["dataset"], options=train_params["projector_params"], **args['network']).to(device)
+    target_network = ResNet18(dataset=args["dataset"], options=train_params["projector_params"], **args['network']).to(
+        device)
     if torch.cuda.device_count() > 1:
         target_network = torch.nn.parallel.DataParallel(target_network)
 
@@ -96,13 +103,14 @@ def main(args):
     # Save network and parameters.
     torch.save(args, "args.pt")
 
-    if args["eval_after_each_epoch"]: 
-        evaluator = Evaluator(args["dataset"], args["dataset_path"], args["test"]["batch_size"]) 
+    if args["eval_after_each_epoch"]:
+        evaluator = Evaluator(args["dataset"], args["dataset_path"], args["test"]["batch_size"])
     else:
         evaluator = None
 
     if args["use_optimizer"] == "adam":
-        optimizer = torch.optim.Adam(params, lr=args['optimizer']['params']["lr"], weight_decay=args["optimizer"]["params"]['weight_decay'])
+        optimizer = torch.optim.Adam(params, lr=args['optimizer']['params']["lr"],
+                                     weight_decay=args["optimizer"]["params"]['weight_decay'])
     elif args["use_optimizer"] == "sgd":
         optimizer = torch.optim.SGD(params, **args['optimizer']['params'])
     else:
@@ -112,12 +120,26 @@ def main(args):
         args["predictor_optimizer"] = args["optimizer"]
 
     if predictor and train_params["train_predictor"]:
-       predictor_optimizer = torch.optim.SGD(predictor.parameters(), **args['predictor_optimizer']['params'])
+        predictor_optimizer = torch.optim.SGD(predictor.parameters(), **args['predictor_optimizer']['params'])
+
+    resume = args["resume"]
+    if resume["re_training"]:
+        ckpt = torch.load(resume["ckpt_dir"], map_location=torch.device(device))
+        online_network.load_state_dict(ckpt['online_network_state_dict'])
+        target_network.load_state_dict(ckpt['target_network_state_dict'])
+        optimizer.load_state_dict(ckpt['optimizer_state_dict'])
+        if predictor:
+            predictor.load_state_dict(ckpt['predictor_state_dict'])
+        args["trainer"]["pre_epoch"] = ckpt['epoch']
+        if predictor and train_params["train_predictor"]:
+            predictor_optimizer.load_state_dict(ckpt["predictor_optimizer_state_dict"])
+        log.info("Load checkpoint from {}.".format(resume["ckpt_dir"]))
 
     ## SimCLR scheduler
-    log_dir = args.get("log_dir", "./")
+    log_dir = args["log_dir"]
     if args["method"] == "simclr":
-        trainer = SimCLRTrainer(log_dir=log_dir, model=online_network, optimizer=optimizer, evaluator=evaluator, device=device, params=args["trainer"])
+        trainer = SimCLRTrainer(log_dir=log_dir, model=online_network, optimizer=optimizer, evaluator=evaluator,
+                                device=device, params=args["trainer"])
     elif args["method"] == "byol":
         trainer = BYOLTrainer(log_dir=log_dir,
                               online_network=online_network,
@@ -136,6 +158,7 @@ def main(args):
     if not args["eval_after_each_epoch"]:
         result_eval = linear_eval(args["dataset"], args["dataset_path"], args["test"]["batch_size"], ["./"], [])
         torch.save(result_eval, "eval.pth")
+
 
 if __name__ == '__main__':
     main()

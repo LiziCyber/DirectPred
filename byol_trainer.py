@@ -8,6 +8,7 @@ from torch.utils.tensorboard import SummaryWriter
 import numpy as np
 from utils import _create_model_training_folder
 from copy import deepcopy
+from tqdm import tqdm
 
 import logging
 log = logging.getLogger(__file__)
@@ -535,7 +536,7 @@ class BYOLTrainer:
 
     def train(self, train_dataset):
         train_loader = DataLoader(train_dataset, batch_size=self.batch_size * torch.cuda.device_count(),
-                                  num_workers=self.num_workers, drop_last=False, shuffle=True)
+                                  num_workers=self.num_workers, drop_last=False, shuffle=True, pin_memory=True)
 
         niter = 0
         model_checkpoints_folder = os.path.join(self.writer.log_dir, 'checkpoints')
@@ -564,7 +565,7 @@ class BYOLTrainer:
             if self.rand_pred_n_epoch is not None and self.rand_pred_n_epoch > 0 and epoch_counter % self.rand_pred_n_epoch == 0:
                 self.restart_pred_save(model_checkpoints_folder, suffix, niter)
 
-            for (batch_view_1, batch_view_2, _), _ in train_loader:
+            for (batch_view_1, batch_view_2, _), _ in tqdm(train_loader):
                 if self.rand_pred_n_iter is not None and self.rand_pred_n_iter > 0 and niter % self.rand_pred_n_iter == 0:
                     self.restart_predictor(False, niter)
                     predictor_path = os.path.join(model_checkpoints_folder, f'reset_predictor_{suffix}_iter{niter}.pth')
